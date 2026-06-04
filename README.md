@@ -1,30 +1,32 @@
 # ⏰ Time Skill
 
-**DST-aware time, timezone conversion, and cross-timezone scheduling for AI agents.**
+**Stop guessing at timezone math. Let your AI agent handle it.**
 
 > *"I get such anxiety scheduling across time zones, even though I do it all day long."* — [real Reddit user](https://codeandsolder.substack.com/p/time-zones-are-causing-havoc)
 
-Time Skill gives your AI agent an accurate real-time clock, Daylight-Saving-aware timezone math, and practical scheduling tools — so it never guesses at times or botches a meeting invite.
+Most AI agents can't tell you what time it is. Seriously. Ask Claude "what time is it in Tokyo?" and it'll either guess wrong or tell you it doesn't have a clock.
 
-Built on the [Agent Skills open standard](https://code.claude.com/docs/en/skills). Works with **Claude Code**, **Claude.ai**, and any AI tool that supports Agent Skills.
+This fixes that. Time Skill plugs into your agent and gives it a real clock, proper timezone conversion (yes, Daylight Saving is handled correctly), and a bunch of scheduling tools that actually work.
+
+It follows the [Agent Skills open standard](https://code.claude.com/docs/en/skills), so it works with Claude Code, Claude.ai, and other compatible AI tools.
 
 ---
 
-## What it does
+## What's in the box
 
-| Command | What it solves |
+| Command | What you'd ask |
 |---------|---------------|
 | `now` | "What time is it in Tokyo right now?" |
-| `convert` | "What's 3pm EST in IST?" — DST-correct, with day-shift warnings |
-| `compare` | Side-by-side current time across 2–10 cities, sorted west→east |
-| `overlap` | Find the working-hours window where everyone's available |
-| `snippet` | One-line `3pm PT / 6pm ET / 11pm London` to paste into Slack/email |
-| `ics` | Generate a downloadable `.ics` calendar invite (stored in UTC) |
-| `dst` | Warn when upcoming clock changes will shift your recurring meetings |
-| `handoff` | Follow-the-sun: who's online now, who comes on next |
-| `epoch` | Decode Unix timestamps (auto-detects seconds/ms/µs) |
+| `convert` | "What's 3pm EST in IST?" |
+| `compare` | Show me the time in Chennai, London, and New York side by side |
+| `overlap` | When can all of us actually meet? |
+| `snippet` | Give me a `3pm PT / 6pm ET / 11pm London` line for my email |
+| `ics` | Make me a calendar invite I can send out |
+| `dst` | Heads up: the clocks change next month and your standing call will shift |
+| `handoff` | Who on the team is online right now? Who's next? |
+| `epoch` | What's this timestamp: `1749009600`? |
 
-**Plus natural-language dates** everywhere: `tomorrow`, `next friday`, `in 3 days`.
+You can also use natural-language dates everywhere: `tomorrow`, `next friday`, `in 3 days`.
 
 ---
 
@@ -61,9 +63,9 @@ cp -r time-skill/time-skill ~/.claude/skills/
 
 ---
 
-## Usage examples
+## How to use it
 
-Once installed, just ask naturally — the skill triggers automatically:
+Once it's installed, just talk normally. The skill picks up on time-related questions automatically:
 
 > "What time is it in Chennai?"
 >
@@ -77,101 +79,104 @@ Once installed, just ask naturally — the skill triggers automatically:
 >
 > "Give me the times for the invite — 3pm IST, 45 min, title Investor Call"
 
-### Direct script usage
+### Running the script directly
 
-You can also run the script directly:
+If you want to use it outside an AI agent, the Python script works standalone:
 
 ```bash
 # Current time
 python3 time-skill/scripts/timezone_tool.py now tokyo
 
-# Convert with natural-language date
+# Convert with a natural-language date
 python3 time-skill/scripts/timezone_tool.py convert "3pm" EST IST "next friday"
 
 # Copy-paste snippet for an email
 python3 time-skill/scripts/timezone_tool.py snippet "3pm" PT ET London IST
 
-# DST warnings for a pair of zones
+# DST warnings for two zones
 python3 time-skill/scripts/timezone_tool.py dst chennai london --months 12
 
-# Follow-the-sun handoff
+# Who's online right now?
 python3 time-skill/scripts/timezone_tool.py handoff chennai london "new york" tokyo
 
 # Calendar invite
 python3 time-skill/scripts/timezone_tool.py ics "3pm" IST --title "Investor call" --when "next monday" --duration 45
 
-# Unix timestamp
+# Decode a Unix timestamp
 python3 time-skill/scripts/timezone_tool.py epoch 1749009600 chennai "new york"
 ```
 
 ---
 
-## Why this exists
+## Why I built this
 
-Research across Reddit, LinkedIn, and developer forums surfaced three recurring timezone failures:
+I dug through Reddit, LinkedIn, and developer forums to understand what actually goes wrong with timezone tools. Three problems kept showing up:
 
-1. **DST mistakes** — "EST" in summer is actually EDT (UTC-4, not UTC-5). Most tools get this wrong. This skill maps abbreviations to geographic zones that auto-adjust.
+**1. DST trips everyone up.** When someone types "EST" in June, they almost certainly mean Eastern Time, which is EDT (UTC-4) in summer. But most tools treat EST as a fixed UTC-5 offset. This skill maps abbreviations to geographic zones that auto-adjust. So "EST" in summer correctly shows EDT, and in winter shows EST.
 
-2. **Manual math errors** — comparing 3+ timezones by hand is error-prone. The `compare` and `overlap` commands eliminate this entirely.
+**2. Mental math breaks down past two timezones.** Comparing Chennai, London, and New York in your head? Good luck. The `compare` and `overlap` commands do it instantly, and `overlap` will tell you straight up if there's no shared window instead of faking one.
 
-3. **Recurring meeting drift** — the US and EU change clocks on *different dates*, silently shifting your standing call by an hour. The `dst` command for two zones flags exactly when this happens.
+**3. Recurring meetings silently break twice a year.** The US and EU change clocks on different dates. Your weekly standup just shifted by an hour and nobody noticed. The `dst` command flags exactly when this happens for any pair of zones.
 
-### Design decisions
+### How it works under the hood
 
-- **No external API** — uses Python's `zoneinfo` standard library (the official IANA timezone database) + the system clock. Zero network dependency.
-- **DST-correct by default** — abbreviations like EST/PST resolve to the geographic zone that auto-adjusts for Daylight Saving.
-- **Honest about ambiguity** — flags that "IST" could mean India/Israel/Ireland, and "CST" could mean US/China/Cuba. Never silently guesses.
-- **Honest about limits** — says "no overlap" when there isn't one, rather than inventing a slot.
+The script reads the system clock and uses Python's `zoneinfo` library, which carries the full IANA timezone database. No API calls, no network requests, no external dependencies. Just the standard library.
+
+A few deliberate choices worth mentioning:
+
+- If a timezone abbreviation is ambiguous (IST could be India, Israel, or Ireland), the skill flags it rather than quietly picking one. Same with CST (US Central vs China vs Cuba).
+- If there's no overlapping work window between two cities, it says so. It won't invent a slot to look helpful.
+- Every output shows the resolved date and offset so you can verify at a glance.
 
 ---
 
 ## Requirements
 
-- Python 3.9+ (for `zoneinfo` standard library)
-- No pip dependencies — uses only the standard library
+- Python 3.9+ (that's when `zoneinfo` was added to the standard library)
+- No pip install needed. Zero dependencies.
 
 ---
 
 ## Supported places
 
-The skill accepts three formats:
+Three ways to name a location:
 
 - **IANA names** (most precise): `America/New_York`, `Asia/Kolkata`, `Europe/London`
-- **~90 city names**: `tokyo`, `chennai`, `"new york"`, `london`, `singapore`, `dubai`
+- **City names** (~90 covered): `tokyo`, `chennai`, `"new york"`, `london`, `singapore`, `dubai`
 - **Abbreviations**: `EST`, `PST`, `IST`, `GMT`, `UTC`, `JST`, `CET`
 
-Every IANA timezone is supported via its full name. The city shortlist covers the most commonly referenced places globally.
+Every IANA timezone works through its full name. The city shortlist covers the places people actually reference in day-to-day scheduling.
 
 ---
 
-## Limitations
+## What it doesn't do (yet)
 
-Transparency matters more than marketing:
+Being upfront about the gaps:
 
-- `overlap` and `handoff` use one shared working-hours range (not per-person hours) and ignore weekends/holidays
-- `overlap` works in whole-hour steps
-- Natural-language dates cover a defined set (`tomorrow`, `next friday`, `in 3 days`) — not arbitrary English
-- Recognizes ~90 cities by name; others need the IANA name
-- For high-stakes scheduling, verify against a second source
+- `overlap` and `handoff` apply one working-hours range to everyone. You can't set 9-5 for one person and 10-6 for another. Weekends and holidays aren't factored in either.
+- `overlap` scans in whole-hour steps, so the window edges aren't minute-precise.
+- Natural-language dates handle a defined set (`tomorrow`, `next friday`, `in 3 days`) but won't parse something like "the second Tuesday of next month."
+- About 90 cities work by name. For anything else, use the IANA name (e.g. `Europe/Warsaw`).
+- For a meeting that really can't go wrong, double-check against a second source.
 
 ---
 
 ## Contributing
 
-Issues and PRs welcome! Some areas where help would be great:
+PRs and issues are welcome. Some things that would make this better:
 
-- Adding more cities to the shortlist
-- Per-person working hours for `overlap`
-- Weekend/holiday awareness
-- Market-hours tracker for investors
-- Visual timeline output
+- More cities in the shortlist
+- Per-person working hours in `overlap`
+- Weekend and holiday awareness
+- A market-hours tracker (stock exchange open/close times)
+- Some kind of visual timeline output
 
 ---
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
 
 ---
 
-Built with research, not guesswork. If timezone pain has ever cost you a meeting, a deal, or your sleep — this is for you.
+If you've ever missed a call because of timezone math, or sent a meeting invite that landed at 3am someone's time, this might save you some grief.
